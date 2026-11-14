@@ -1,0 +1,49 @@
+# Azure Pipelines CI for the HelloDevOps .NET 10 Web API
+# Runs on every push and pull request to main.
+
+trigger:
+  branches:
+    include:
+      - main
+
+pr:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  buildConfiguration: Release
+  dotnetVersion: 10.x
+
+steps:
+  - task: UseDotNet@2
+    displayName: Install .NET SDK $(dotnetVersion)
+    inputs:
+      packageType: sdk
+      version: $(dotnetVersion)
+
+  - script: dotnet restore AzureDevOpsSetup.slnx
+    displayName: Restore NuGet packages
+
+  - script: dotnet build AzureDevOpsSetup.slnx --configuration $(buildConfiguration) --no-restore
+    displayName: Build ($(buildConfiguration))
+
+  - task: DotNetCoreCLI@2
+    displayName: Run unit tests
+    inputs:
+      command: test
+      projects: tests/**/*.csproj
+      arguments: --configuration $(buildConfiguration) --no-build --collect:"XPlat Code Coverage"
+      publishTestResults: true
+
+  - script: dotnet publish src/HelloDevOps.Api/HelloDevOps.Api.csproj --configuration $(buildConfiguration) --no-build --output $(Build.ArtifactStagingDirectory)/api
+    displayName: Publish API
+
+  - task: PublishPipelineArtifact@1
+    displayName: Upload build artifact
+    inputs:
+      targetPath: $(Build.ArtifactStagingDirectory)/api
+      artifact: hello-devops-api
